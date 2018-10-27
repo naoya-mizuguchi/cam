@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+<head>
+ <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+ <title>prototype</title>
+ <script type="text/javascript" src="three.min.js"></script>
+ <script type="text/javascript" src="enchant.min.js"></script>
+ <script type="text/javascript" src="clmtrackr.js"></script>
+ <!-- https://github.com/auduno/clmtrackr -->
+ <script type="text/javascript" src="model_pca_20_svm.js"></script>
+ <!-- <script type="text/javascript" src="WebGazer-master/www/webgazer.js"></script> -->
+ <style>
+ .wrapper{
+   position: relative;
+ }
+ .contents{
+
+ }
+ .video{
+   position: absolute;
+   width: 200px;
+   height: 200px;
+   bottom: 0px;
+   background: white;
+   border: 1px solid red;
+   font-size: 10px;
+ }
+ .display{
+  padding-top: 100px;
+  transform: scale(-1, 1);
+ }
+ .video_wrapper{
+   position: relative;
+ }
+ .display2{
+   position: absolute;
+   left: 0;
+   top: 0;
+   transform: scale(-1, 1);
+ }
+ .videoreverse{
+   transform: scale(-1, 1);
+ }
+ .video_wrapper3{
+   position: relative;
+ }
+ .display3{
+   position: absolute;
+   left: 0;
+   top: 0;
+ }
+ </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <div id="container" class="contents"></div>
+    <video id="video" class="video" autoplay style="width: 320px; height: 240px; border: 1px solid black;"></video>
+    <!-- <video id="video" class="video" autoplay></video> -->
+  </div>
+  <canvas id="display_canvas" width="400" height="300" class="display"></canvas>
+  <div>↑取得したビデオ画像の画像処理(今は色反転)</div>
+  <div class = "video_wrapper">
+    <video id="videoInput" width="400" height="300" autoplay class="videoreverse"></video>
+    <canvas id="display_canvas2" width="400" height="300" class="display2"></canvas>
+  </div>
+  <div>↑フェイストラッキング</div>
+  <div id="dat"></div>
+  <div class = "video_wrapper3">
+  </div>
+  <div>↓特徴点の位置</div>
+  <div id="pos"></div>
+</body>
+<script>
+
+init();
+animate();
+
+function init() {
+  var container, mesh;
+
+  container = document.getElementById('container');
+
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1100);
+  camera.target = new THREE.Vector3(0, 0, 0);
+
+  scene = new THREE.Scene();
+
+  var geometry = new THREE.SphereGeometry(500, 60, 40);
+  geometry.scale(1, 1, -1);
+  material = new THREE.MeshBasicMaterial({map : THREE.ImageUtils.loadTexture("path_1.jpg")});
+
+  sphere = new THREE.Mesh(geometry, material);
+
+  scene.add(sphere);
+
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  update();
+}
+
+function update() {
+  renderer.render(scene, camera);
+}
+
+</script>
+
+<script type="text/javascript">
+  // const medias = {audio : false, video : true},
+  //     video  = document.getElementById("video");
+  var medias = {audio : false, video : true};
+  var video = document.getElementById('video');
+
+  navigator.getUserMedia(medias, successCallback, errorCallback);
+
+  function successCallback(stream) {
+    video.srcObject = stream;
+
+    renderStart();
+  };
+
+  function errorCallback(err) {
+    alert(err);
+  };
+
+  function renderStart() {
+  	// var video = document.getElementById('video');
+  	var buffer = document.createElement('canvas');
+  	var display = document.getElementById('display_canvas');
+  	var bufferContext = buffer.getContext('2d');
+  	var displayContext = display.getContext('2d');
+
+
+  	var render = function() {
+  		requestAnimationFrame(render);
+  		var width = video.videoWidth;
+  		var height = video.videoHeight;
+  		if (width == 0 || height == 0) {return;}
+  		buffer.width = display.width = width;
+  		buffer.height = display.height = height;
+  		bufferContext.drawImage(video, 0, 0);
+
+  		var src = bufferContext.getImageData(0, 0, width, height); // カメラ画像のデータ
+  		var dest = bufferContext.createImageData(buffer.width, buffer.height); // 空のデータ（サイズはカメラ画像と一緒）
+
+      for (var i = 0; i < dest.data.length; i += 4) {
+      	dest.data[i + 0] = 255 - src.data[i + 0]; // Red
+      	dest.data[i + 1] = 255 - src.data[i + 1]; // Green
+      	dest.data[i + 2] = 255 - src.data[i + 2]; // Blue
+      	dest.data[i + 3] = 255;                     // Alpha
+      }
+      displayContext.putImageData(dest, 0, 0);
+  	};
+  	render();
+  }
+</script>
+
+<script>
+var videoInput = document.getElementById("videoInput");
+// getUserMedia によるカメラ映像の取得
+var media = navigator.mediaDevices.getUserMedia({       // メディアデバイスを取得
+  video: {facingMode: "user"},                          // カメラの映像を使う（スマホならインカメラ）
+  audio: false                                          // マイクの音声は使わない
+});
+media.then((stream) => {                                // メディアデバイスが取得できたら
+  // videoInput.src = window.URL.createObjectURL(stream);       // video 要素にストリームを渡す
+  videoInput.srcObject = stream;
+});
+
+
+var canvas = document.getElementById("display_canvas2");
+var context = canvas.getContext("2d");
+var tracker = new clm.tracker();
+tracker.init(pModel);
+tracker.start(videoInput);
+drawLoop();
+
+function drawLoop(){
+  requestAnimationFrame(drawLoop);
+  var positions = tracker.getCurrentPosition();
+  if (positions != false){
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    ShowPostionData(positions);
+    tracker.draw(canvas);
+  }
+}
+
+function ShowPostionData(pos){
+  var str = "";
+  for (var i = 0; i<pos.length;i++){
+    str += "pos=" + i + " " + "x: " + pos[i][0].toFixed(0) + ", y: " +pos[i][1].toFixed(0) + "<br>";
+  }
+  var pos = document.getElementById("pos");             // データ表示用div要素の取得
+  pos.innerHTML = str;                                  // データ文字列の表示
+
+}
+</script>
+
+</html>
