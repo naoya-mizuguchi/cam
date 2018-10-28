@@ -113,7 +113,6 @@ function init() {
 
   scene.add(sphere);
 
-
   renderer = new THREE.WebGLRenderer();
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -153,25 +152,22 @@ function update() {
       if(pos > 65) pos = 65;
 
       var filepath = "Resources/path_" + pos + ".jpg";
-      THREE.ImageUtils.loadTexture(filepath, null, function(tex) {
-        // if (pid === _pid) {
-          material.map.dispose();
-          material.map = tex;
-          material.map.needsUpdate = true;
-          sphere.rotation.y = THREE.Math.degToRad(180.0);
-        // }
-      });
-      // document.getElementById("TouchText").innerHTML = filepath;
-      // THREE.ImageUtils.loadTexture(filepath, null, function(tex) {
-      //   material.map.dispose();
-      //   material.map = tex;
-      //   material.map.needsUpdate = true;
-      //   sphere.rotation.y = THREE.Math.degToRad(sphereAngleOffset);
-      // });
+      updatesphere(filepath);
   }
 
   renderer.render(scene, camera);
+}
 
+
+function updatesphere(filepath){
+  THREE.ImageUtils.loadTexture(filepath, null, function(tex) {
+    // if (pid === _pid) {
+      material.map.dispose();
+      material.map = tex;
+      material.map.needsUpdate = true;
+      sphere.rotation.y = THREE.Math.degToRad(180.0);
+    // }
+  });
 }
 
 </script>
@@ -240,13 +236,13 @@ function drawLoop(){
   if (positions != false){
     var parameters = tracker.getCurrentParameters();
     var emotion = classifier.meanPredict(parameters);
-    showEmotionData(emotion);
+    UpdatePosfromEmotion(emotion);
     context.clearRect(0, 0, canvas.width, canvas.height);
     tracker.draw(canvas);
   }
 }
 
-function showEmotionData(emo) {
+function UpdatePosfromEmotion(emo) {
   var str ="";                                          // データの文字列を入れる変数
   for(var i = 0; i < emo.length; i++) {                 // 全ての感情（6種類）について
     str += emo[i].emotion + ": "                        // 感情名
@@ -254,6 +250,21 @@ function showEmotionData(emo) {
   }
   var dat = document.getElementById("dat");             // データ表示用div要素の取得
   dat.innerHTML = str;                                  // データ文字列の表示
+
+  if (Number(emo[5].value.toFixed(3)) > 0.5){
+    pos += 1;
+    if(pos < 1) pos = 1;
+    if(pos > 65) pos = 65;
+    var filepath = "Resources/path_" + pos + ".jpg";
+    updatesphere(filepath);
+  } else if (Number(emo[3].value.toFixed(3)) > 0.3){
+    pos -= 1;
+    if(pos < 1) pos = 1;
+    if(pos > 65) pos = 65;
+    var filepath = "Resources/path_" + pos + ".jpg";
+    updatesphere(filepath);
+  }
+
 }
 </script>
 
